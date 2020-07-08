@@ -83,6 +83,24 @@ class CharlesSessionHacker:
         all_headers = set(c.keys())
         return common_headers, static_headers, all_headers
 
+    class MethodBlueprint:
+        def __init__(self):
+            self.function_name = None
+            self.rest_type = None
+            self.endpoint = None
+            self.expected_request = None
+            self.expected_response = None
+            # Which extra headers for this function
+            self.extra_headers = []
+            self.unused_headers = []
+
+        def __hash__(self):
+            return hash(self.function_name)
+
+        def __eq__(self, other):
+            if not isinstance(other, type(self)): return NotImplemented
+            return self.function_name == other.function_name
+
     def apply_request_transformer(self, mine_type=None):
         self._apply_transformer(self.request_transformer, "request", mine_type)
 
