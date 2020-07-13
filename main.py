@@ -101,6 +101,47 @@ class CharlesSessionHacker:
             if not isinstance(other, type(self)): return NotImplemented
             return self.function_name == other.function_name
 
+    def _get_method_information(self, common_headers):
+        method_blueprint_list = list()
+
+        for json_element in self.charles_session:
+            method_blueprint = self.MethodBlueprint()
+
+            rest_type = json_element["method"]
+            endpoint: str = json_element["path"]
+            function_name = rest_type + endpoint[1:].replace("/", "_")
+            method_blueprint.function_name = function_name
+
+            if method_blueprint in method_blueprint_list:
+                continue
+
+            method_blueprint.rest_type = rest_type
+            method_blueprint.endpoint = endpoint
+
+            if json_element["request"]["sizes"]["body"] == 0:
+                method_blueprint.expected_request = "Empty"
+            else:
+                decoded_request = base64.b64decode(json_element["request"]["body"]["encoded"]).decode()
+                request_json = json.loads(decoded_request)
+                method_blueprint.expected_request = json.dumps(request_json, indent=4)
+
+            if json_element["response"]["sizes"]["body"] == 0:
+                method_blueprint.expected_response = "Empty"
+            else:
+                decoded_request = base64.b64decode(json_element["response"]["body"]["encoded"]).decode()
+                response_json = json.loads(decoded_request)
+                method_blueprint.expected_response = json.dumps(response_json, indent=4)
+
+            request_headers = set()
+            for header in json_element["request"]["header"]["headers"]:
+                name = header["name"]
+                request_headers.add(name)
+
+            method_blueprint.extra_headers = request_headers - common_headers
+            method_blueprint.unused_headers = common_headers - request_headers
+            method_blueprint_list.append(method_blueprint)
+        return method_blueprint_list
+
     def apply_request_transformer(self, mine_type=None):
         self._apply_transformer(self.request_transformer, "request", mine_type)
 
