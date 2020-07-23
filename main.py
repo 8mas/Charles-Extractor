@@ -142,6 +142,61 @@ class CharlesSessionHacker:
             method_blueprint_list.append(method_blueprint)
         return method_blueprint_list
 
+    def generate_method_blueprint(self, skip_hints="response"):
+        common_headers, static_headers, all_headers = self._get_headers()
+        method_blueprint_list = self._get_method_information(common_headers)
+
+        headers_print = dict(static_headers)
+        for name in common_headers:
+            if name not in headers_print.keys():
+                headers_print[name] = "TODO_Define"
+
+        dump_file = open("out.py", "w")
+
+        headers = f"""
+        # All headers
+        \"\"\"
+        {all_headers}
+        \"\"\"
+        # Headers
+        common_headers = {json.dumps(dict(headers_print), indent=12)}
+        """
+        dump_file.write(headers)
+
+        CURRENT_INDENT_LEVEL = 12
+        for method_blueprint in method_blueprint_list:
+            method_text = (
+                f"""
+            \"\"\"
+            """
+
+                f"""{
+                "Expected Request:"
+                f"{textwrap.indent(method_blueprint.expected_request, ' ' * CURRENT_INDENT_LEVEL)}"
+                if skip_hints != "all" and skip_hints != "request" else ""}
+            """
+
+                f"""{
+                "Expected response:" +
+                f"{textwrap.indent(method_blueprint.expected_response, ' ' * CURRENT_INDENT_LEVEL)}"
+                if skip_hints != "all" and skip_hints != "response" else ""} 
+            """
+
+                f"""
+            \"\"\"
+            """
+
+                f"""
+            def {method_blueprint.function_name}():
+                self._{method_blueprint.rest_type.lower()}"""
+                f"""("{method_blueprint.endpoint}"{f", add_header={method_blueprint.extra_headers}" if method_blueprint.extra_headers else ''} """
+                f"""{f", remove_header={method_blueprint.unused_headers}" if method_blueprint.unused_headers else ''}) """
+            )
+
+            method_text = textwrap.dedent(method_text)
+            dump_file.write(method_text)
+        dump_file.close()
+
     def apply_request_transformer(self, mine_type=None):
         self._apply_transformer(self.request_transformer, "request", mine_type)
 
