@@ -109,7 +109,7 @@ class CharlesSessionHacker:
 
             rest_type = json_element["method"]
             endpoint: str = json_element["path"]
-            function_name = rest_type + endpoint[1:].replace("/", "_")
+            function_name = rest_type + "__" + endpoint[1:].replace("/", "_")
             method_blueprint.function_name = function_name
 
             if method_blueprint in method_blueprint_list:
