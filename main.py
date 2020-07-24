@@ -3,7 +3,9 @@ from collections import Counter
 import base64
 import json
 from json import JSONDecodeError
-import textwrap
+import re
+
+from header_blueprint import *
 
 
 class CharlesSessionHacker:
@@ -22,6 +24,7 @@ class CharlesSessionHacker:
     """
     Returns the request body in bytes!
     """
+
     def _get_charles_request_body(self, request_body: dict) -> bytes:
         encode_body = request_body.get("encoded", None)
         if encode_body:
@@ -51,7 +54,8 @@ class CharlesSessionHacker:
 
             for h_index, header in enumerate(charles_json_element[transformer_type]["header"]["headers"]):
                 if header["name"] == "Content-Length":
-                    charles_json_element[transformer_type]["header"]["headers"][h_index]["value"] = len(new_request_body)
+                    charles_json_element[transformer_type]["header"]["headers"][h_index]["value"] = len(
+                        new_request_body)
 
             charles_json_element[transformer_type]["sizes"]["body"] = len(new_request_body)
             self._set_charles_request_body(transformer_type, charles_json_element, new_request_body)
@@ -90,7 +94,7 @@ class CharlesSessionHacker:
 
         common_headers = set()
         for key, item in c.items():
-            if item / len(endpoint_list) > 0.5: # Identifiy most common headers
+            if item / len(endpoint_list) > 0.5:  # Identifiy most common headers
                 common_headers.add(key)
 
         static_headers = set(header_list[0])
@@ -126,7 +130,8 @@ class CharlesSessionHacker:
 
             rest_type = json_element["method"]
             endpoint: str = json_element["path"]
-            function_name = rest_type + "__" + endpoint[1:].replace("/", "_")  # Make the function name python conform
+            function_name = rest_type + "_" + endpoint[1:].replace("/", "_")  # Make the function name python conform
+            function_name = function_name.replace(".","")
             method_blueprint.function_name = function_name
 
             if method_blueprint in method_blueprint_list:
@@ -167,15 +172,15 @@ class CharlesSessionHacker:
             method_blueprint_list.append(method_blueprint)
         return method_blueprint_list
 
-
     """
     Generates the blueprints for the methods.
     Currently only json is supported. Text or xml requests not.
-    skip_hints: Comments for expected request and or response?
+    skip_hints: Comments for expected request and or response, "all" for skip all
     generate_call_sequence: Creates a function that calls all the generated methods
         in the oder that they have in the session
     hardcoded_requests: methods call the api _post, _get .. with hardcoded values 
     """
+
     def generate_method_blueprint(self, skip_hints="response", generate_call_sequence=False, hardcoded_requests=False):
         common_headers, static_headers, all_headers = self._get_headers()
         method_blueprint_list = self._get_method_information(common_headers)
@@ -186,51 +191,31 @@ class CharlesSessionHacker:
                 headers_print[name] = "TODO_Define"
 
         dump_file = open("out.py", "w")
-        # Todo super hacky
-        headers = f"""
-        # All headers
-        \"\"\"
-        {all_headers}
-        \"\"\"
-        # Headers
-        common_headers = {json.dumps(dict(headers_print), indent=12)}
-        """
+        headers = all_headers_blueprint.format(all_headers=all_headers)
         dump_file.write(headers)
 
-        CURRENT_INDENT_LEVEL = 12
         for method_blueprint in method_blueprint_list:
-            method_text = (
-            f"""
-            \"\"\"
-            """
-            
-                f"""{
-                "Expected Request:"
-                f"{textwrap.indent(method_blueprint.expected_request, ' ' * CURRENT_INDENT_LEVEL)}"
-                if skip_hints != "all" and skip_hints != "request" else ""}
-                """
+            request_description = ""
+            response_description = ""
+            if skip_hints != "request":
+                request_description = request_description_blueprint.format(
+                    expected_request=method_blueprint.expected_request)
+            if skip_hints != "response":
+                response_description = response_description_blueprint.format(
+                    expected_response=method_blueprint.expected_response)
 
-                f"""{
-                "Expected response:" +
-                f"{textwrap.indent(method_blueprint.expected_response, ' ' * CURRENT_INDENT_LEVEL)}"
-                if skip_hints != "all" and skip_hints != "response" else ""} 
-                """
+            if skip_hints != "all":
+                method_description = method_description_blueprint.format(request_description=request_description,
+                                                                         response_description=response_description)
+                dump_file.write(method_description)
 
-            f"""
-            \"\"\"
-            """
-
-            f"""
-            def {method_blueprint.function_name}():
-                self._{method_blueprint.rest_type.lower()}"""
-                f"""("{method_blueprint.endpoint}"{f", add_header={method_blueprint.extra_headers}" if method_blueprint.extra_headers else ''} """
-                f"""{f", remove_header={method_blueprint.unused_headers}" if method_blueprint.unused_headers else ''}) """
-            )
-
-            method_text = textwrap.dedent(method_text)
-            dump_file.write(method_text)
+            method_definition = method_definition_blueprint.format(function_name=method_blueprint.function_name,
+                                                                   endpoint_type=method_blueprint.rest_type,
+                                                                   endpoint=method_blueprint.endpoint,
+                                                                   add_headers=method_blueprint.extra_headers,
+                                                                   remove_headers=method_blueprint.unused_headers)
+            dump_file.write(method_definition)
         dump_file.close()
-
 
     def apply_request_transformer(self, mine_type=None):
         self._apply_transformer(self.request_transformer, "request", mine_type)
@@ -243,9 +228,10 @@ class CharlesSessionHacker:
         with open(path_to_session, "w") as session_file:
             session_file.write(data)
 
+
 if __name__ == '__main__':
     a = CharlesSessionHacker("Test_OtherExport.chlsj", lambda x: "LoLoLoLoLoLoLoLoLoLoL")
     a.apply_request_transformer()
     a.apply_response_transformer()
-    a.generate_method_blueprint(skip_hints=None)
-    #a.write_changes_to_session_file()
+    a.generate_method_blueprint(skip_hints="none")
+    # a.write_changes_to_session_file()
