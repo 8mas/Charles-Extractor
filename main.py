@@ -141,7 +141,7 @@ class CharlesSessionHacker:
             method_blueprint.endpoint = endpoint
 
             if json_element["request"]["sizes"]["body"] == 0:
-                method_blueprint.expected_request = "None"
+                method_blueprint.expected_request = None
             else:
                 request_body = self._get_charles_request_body(json_element["request"]["body"]).decode()
                 try:
@@ -152,7 +152,7 @@ class CharlesSessionHacker:
                 method_blueprint.expected_request = request_data
 
             if json_element["response"]["sizes"]["body"] == 0:
-                method_blueprint.expected_response = "#Empty"
+                method_blueprint.expected_response = None
             else:
                 request_body = self._get_charles_request_body(json_element["response"]["body"]).decode()
                 try:
@@ -217,7 +217,8 @@ class CharlesSessionHacker:
                 expected_request = expected_request.replace("false", "False").replace("true", "True").replace("null", "None")
                 expected_request = expected_request[:expected_request.rfind("\n")] + "\n    }" # fix json dumps format at the end
             except:
-                expected_request = '"' + method_blueprint.expected_request + '"'
+                if type(expected_request) is str:
+                    expected_request = '"' + method_blueprint.expected_request + '"'
 
             method_definition = method_definition_blueprint.format(function_name=method_blueprint.function_name,
                                                                    payload=expected_request,
@@ -227,6 +228,9 @@ class CharlesSessionHacker:
                                                                    remove_headers=method_blueprint.unused_headers)
 
             # replace empty parameters
+            if expected_request is None:
+                method_definition = method_definition.replace(empty_payload_format, "")
+                method_definition = method_definition.replace(empty_payload_param_format, "")
             method_definition = method_definition.replace(empty_add_header_format, "")
             method_definition = method_definition.replace(empty_remove_header_format, "")
 
