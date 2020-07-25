@@ -5,7 +5,7 @@ import json
 from json import JSONDecodeError
 import re
 
-from header_blueprint import *
+from text_blueprints import *
 
 
 class CharlesSessionHacker:
@@ -131,7 +131,7 @@ class CharlesSessionHacker:
             rest_type = json_element["method"]
             endpoint: str = json_element["path"]
             function_name = rest_type + "_" + endpoint[1:].replace("/", "_")  # Make the function name python conform
-            function_name = function_name.replace(".","")
+            function_name = function_name.replace(".", "")
             method_blueprint.function_name = function_name
 
             if method_blueprint in method_blueprint_list:
@@ -141,7 +141,7 @@ class CharlesSessionHacker:
             method_blueprint.endpoint = endpoint
 
             if json_element["request"]["sizes"]["body"] == 0:
-                method_blueprint.expected_request = "#Empty"  # Comment Empty out in case that hardcoded requests is set
+                method_blueprint.expected_request = "None"
             else:
                 request_body = self._get_charles_request_body(json_element["request"]["body"]).decode()
                 try:
@@ -190,6 +190,7 @@ class CharlesSessionHacker:
             if name not in headers_print.keys():
                 headers_print[name] = "TODO_Define"
 
+        # Todo, hacky
         dump_file = open("out.py", "w")
         headers = all_headers_blueprint.format(all_headers=all_headers)
         dump_file.write(headers)
@@ -209,11 +210,26 @@ class CharlesSessionHacker:
                                                                          response_description=response_description)
                 dump_file.write(method_description)
 
+            expected_request = method_blueprint.expected_request
+            try:
+                expected_request = json.loads(expected_request)
+                expected_request = json.dumps(expected_request, indent=8)
+                expected_request = expected_request.replace("false", "False").replace("true", "True").replace("null", "None")
+                expected_request = expected_request[:expected_request.rfind("\n")] + "\n    }" # fix json dumps format at the end
+            except:
+                expected_request = '"' + method_blueprint.expected_request + '"'
+
             method_definition = method_definition_blueprint.format(function_name=method_blueprint.function_name,
+                                                                   payload=expected_request,
                                                                    endpoint_type=method_blueprint.rest_type,
                                                                    endpoint=method_blueprint.endpoint,
                                                                    add_headers=method_blueprint.extra_headers,
                                                                    remove_headers=method_blueprint.unused_headers)
+
+            # replace empty parameters
+            method_definition = method_definition.replace(empty_add_header_format, "")
+            method_definition = method_definition.replace(empty_remove_header_format, "")
+
             dump_file.write(method_definition)
         dump_file.close()
 
@@ -230,7 +246,7 @@ class CharlesSessionHacker:
 
 
 if __name__ == '__main__':
-    a = CharlesSessionHacker("Test_OtherExport.chlsj", lambda x: "LoLoLoLoLoLoLoLoLoLoL")
+    a = CharlesSessionHacker("Test_OtherExport.chlsj")
     a.apply_request_transformer()
     a.apply_response_transformer()
     a.generate_method_blueprint(skip_hints="none")

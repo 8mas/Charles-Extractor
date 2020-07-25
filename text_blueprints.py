@@ -14,12 +14,15 @@ response_description_blueprint = """
     {expected_response}
 """
 
-
 method_description_blueprint = """
 \"\"\"{request_description}{response_description}\"\"\"
 """
 
 method_definition_blueprint = """
 def {function_name}():
-    response = self._{endpoint_type}("{endpoint}", add_header={add_headers}, remove_header={remove_headers})
+    payload = {payload}
+    response = self._{endpoint_type}("{endpoint}", payload, add_header={add_headers}, remove_header={remove_headers})
 """
+
+empty_add_header_format = """, add_header=set()"""
+empty_remove_header_format = """, remove_header=set()"""
